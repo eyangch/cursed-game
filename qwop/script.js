@@ -104,6 +104,37 @@ function drawTensor(data){
     ctx.putImageData(imageData, 0, 0);
 }
 
+let playing = true;
+
+const slider_div = document.getElementById("sliders");
+let sliders = [];
+let labels = [];
+for(let i = 0; i < 16; i++){
+    const group_div = document.createElement("div");
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.style = "width: 50%";
+    slider.min = -10;
+    slider.max = 10;
+    slider.step = "any";
+    slider.value = 0;
+    group_div.appendChild(slider);
+
+    const label = document.createElement("span");
+    label.innerHTML = "0.00";
+    group_div.appendChild(label);
+
+    slider.addEventListener("input", () => {
+        label.innerHTML = Number(slider.value).toFixed(2);
+        state.cpuData[i] = slider.value;
+    });
+
+    slider_div.appendChild(group_div);
+    sliders.push(slider);
+    labels.push(label);
+}
+
 async function main(){
     const lstm_session = await ort.InferenceSession.create(
         'onnx_lstm.onnx', 
@@ -116,7 +147,13 @@ async function main(){
     );
 
     setInterval(async () => {
-        await run_lstm_inference(lstm_session);
+        if(playing){
+            await run_lstm_inference(lstm_session);
+            for(let i = 0; i < 16; i++){
+                sliders[i].value = state.cpuData[i];
+                labels[i].innerHTML = state.cpuData[i].toFixed(2);
+            }
+        }
         const decoded_img = await run_decoder_inference(decoder_session);
         drawTensor(decoded_img);
     }, 75);
@@ -139,3 +176,14 @@ for(const c of ['q', 'w', 'o', 'p', 'r']){
         processKeyUp({"key": c});
     });
 }
+
+const play_pause = document.getElementById("play-pause");
+
+play_pause.addEventListener("click", () => {
+    if(playing){
+        play_pause.innerHTML = "play";
+    }else{
+        play_pause.innerHTML = "pause";
+    }
+    playing = !playing;
+});
