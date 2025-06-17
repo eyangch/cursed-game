@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hallucinating QWOP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <style>
+      .scroll-down-icon {
+        animation: bounce 2s infinite;
+      }
+      .text-justify {
+        text-align: justify;
+      }
+      @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+          transform: translateY(0);
+        }
+        40% {
+          transform: translateY(-20px);
+        }
+        60% {
+          transform: translateY(-10px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+        <div class="d-flex flex-column vh-100">
+            <div class="m-auto flex-column">
+              <div class="text-center display-5">
+                Hallucinating <a href="https://www.foddy.net/Athletics.html">QWOP</a>
+              </div>
+              <div class="text-center py-2">eyangch</div>
+              <div class="vh-20 text-center py-4">
+                <img class="h-100 border" src="qwop.gif"></img>
+              </div>
+              <div class="d-flex text-center justify-content-center">
+                <a class="btn btn-outline-primary mx-2" href="qwop">Try it out</a>
+                <a class="btn btn-outline-secondary mx-2">View Code</a>
+              </div>
+            </div>
+            <div class="text-center p-4">
+              <div class="scroll-down-icon" id="scroll-down-icon">
+                <a class="bi bi-arrow-down-circle h1" href="#info"></a>
+              </div>
+            </div>
+        </div>
+        <div class="mx-auto mt-4 w-50" id="info">
+          <h2 class="text-center mt-5">About</h2>
+          <p class="text-justify mt-3">
+            This 6.8M parameter model performs inference in the browser to simulate the game QWOP. It is trained on simulated QWOP games using random keypresses, and in total took &lt;1 hour to train on an Nvidia L4 GPU.
+          </p>
+          <h2 class="text-center mt-5">Model Architecture</h2>
+          <p class="text-justify mt-3">
+            An autoencoder and LSTM are present in this model. First, the autoencoder is trained to compress a 96x96x3 RGB game image into a 16-element state vector. Then, the LSTM predicts the next state based off the current state and keys pressed. Essentially, the model looks like this:
+          </p>
+          <img class="w-100" src="model_overview.png"></img>
+          <p class="text-justify">
+            The encoder has four Conv2d layers followed by a LayerNorm followed by two Linear layers, and the decoder has two Linear layers followed by four ConvTranspose2d layers. The next state predictor consists of three LSTM layers followed by four Linear layers, and it outputs the predicted difference between the current state and next state.
+          </p>
+          <h2 class="text-center mt-5">Gathering Data</h2>
+          <p class="text-justify mt-3">
+            In total, just under 700 MB of data compressed using GZIP was collected for training using Playwright to generate QWOP simulations from <a href="https://www.foddy.net/Athletics.html">here</a> using semi-random keypresses.
+          </p>
+          <p class="text-justify">
+            For the autoencoder, 45000 frames of QWOP were used, while for the LSTM, 36000 episodes of 256 frames each were collected, for over 9 million frames. This is one reason the autoencoder was trained separately from the LSTM, so that the frames could be compressed prior to storage using the autoencoder.
+          </p>
+          <h2 class="text-center mt-5">Loss</h2>
+          <p class="text-justify mt-3">
+            Three different loss functions are used for the autoencoder.
+            <ol>
+              <li><b>MSE Loss</b>: Raw pixel differences are used to calculate how different the original image and the reconstructed image is.</li>
+              <li><b>Blurred Sobel Loss</b>: A sobel filter (edge detection) plus blur is put on the original and reconstruction, then MSE is applied to those, to value sharper edges.</li>
+              <li><b>Interpretability Loss</b>: This loss attempts to make the autoencoder more "interpretable" by making the 16 features more independent. The percent difference in features is normalized across the features, then summed up. Since the squares add up to one, a lower loss means fewer features change across adjacent frames.</li>
+            </ol>
+          </p>
+          <p class="text-justify">
+            First, pure MSE loss is used due to its stability, then once adequate performance is obtained, the other two losses are added to the MSE loss.
+          </p>
+          <p class="text-justify">
+            For the LSTM, a weighted MSE loss between the true next state and the predicted next state is used. First, for each of the 16 features, the mean and standard deviation of the difference between adjacent frames is calculated. Then, the LSTM outputs a feature-normalized difference, which is unnormalized using the means and standard deviations for each feature and added to the current state. Then, the reciprocal of the standard deviations is used as weights for the MSE.
+          </p>
+          <h2 class="text-center mt-5">Adding Noise</h2>
+          <p class="text-justify mt-3">
+            To increase stability and reduce overfitting, noise is added during both the training of the autoencoder and LSTM.
+          </p>
+          <p class="text-justify">
+            For the autoencoder during training, after encoding, each feature is multiplied by a random variable with mean 1 and standard deviation 0.05. This encourages the autoencoder to evenly distribute frames into its latent space. The LSTM is also trained with noise for each feature equal 10 percent of the standard deviation of the frame differences.
+          </p>
+          <h2 class="text-center mt-5">Cost and Performance</h2>
+          <p class="text-justify mt-3">
+            On my laptop running Chrome, I was able to get a theoretical maximum FPS of approximately 60. Training was done using Modal's free plan running on an L4 GPU for under an hour. A total of ~$20 of free credits was used in development/testing, and the final model was trained using less than $1. Data generation occurs at about 1000 episodes of 256 per hour, for a total of 36 hours of data generation occuring on my laptop.
+          </p>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js" integrity="sha384-j1CDi7MgGQ12Z7Qab0qlWQ/Qqz24Gc6BM0thvEMVjHnfYGF0rmFCozFSxQBxwHKO" crossorigin="anonymous"></script>
+  </body>
+</html>
